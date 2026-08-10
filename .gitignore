@@ -27,6 +27,18 @@
 
 # Local config / secrets
 *.env
+.env
+.env.*
 appsettings.*.local.json
 secrets.json
 okx-*.json
+
+# Runtime state / logs
+data/
+logs/
+*.db
+*.db-journal
+*.log
+
+# macOS noise
+.DS_Store

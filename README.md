@@ -1,20 +1,78 @@
 # Micro Grid Bot
 
-Grid trading bot for the OKX exchange, built with .NET and [CryptoExchange.Net](https://github.com/JKorf/CryptoExchange.Net).
+Automated spot micro-grid trading bot for **OKX BTC-USDT** (v1). Designed to run in a container on
+any host with Docker / Podman / OrbStack. The trading engine is exchange-agnostic behind
+`IExchangeGateway`; the v1 adapter wraps [OKX.Net](https://github.com/JKorf/CryptoExchange.Net),
+which sits on [CryptoExchange.Net](https://github.com/JKorf/CryptoExchange.Net).
 
-## Status
+> **Status (v1):** pure domain + paper-gateway scaffold only. **No live exchange wiring yet.**
+> 13/13 domain tests green; no exchange I/O in this build.
 
-Scaffold only. Design and scope are being worked out. No trading logic yet.
+See [`docs/scope/okx-spot-btc-micro-grid.md`](./docs/scope/okx-spot-btc-micro-grid.md) for the
+accepted v1 product scope and [`docs/architecture/overview.md`](./docs/architecture/overview.md)
+for the locked architecture (multi-exchange boundary, hostability rules, scope defaults).
 
-## Stack
+## Solution layout
 
-- .NET (C#)
-- CryptoExchange.Net for OKX connectivity
+```
+MicroGrid.sln
+Directory.Build.props        shared TFM / nullable / warnings-as-errors
+src/
+  MicroGrid.Domain/          pure: CapitalAllocator, GeometricGrid, InventoryLedger
+  MicroGrid.Application/     ports: IExchangeGateway (multi-exchange boundary)
+  MicroGrid.Bot/             generic-host worker (entry point)
+tests/
+  MicroGrid.Domain.Tests/    xUnit, no network
+Dockerfile                   multi-stage, non-root, dotnet/runtime:10.0
+.dockerignore
+```
+
+| Project | Purpose | Public types |
+|---|---|---|
+| `MicroGrid.Domain` | Allocation, grid math, ledger. No I/O. | `GridSettings`, `CapitalAllocator.Allocation`, `GeometricGrid`, `InventoryLedger` |
+| `MicroGrid.Application` | Exchange-agnostic ports. | `IExchangeGateway`, `InstrumentSpec`, `Balances`, `OrderUpdate`, … |
+| `MicroGrid.Bot` | Worker entry point. | `Program` |
+| `MicroGrid.Domain.Tests` | xUnit tests for the pure domain. | — |
+
+## Build & test
+
+```bash
+dotnet test MicroGrid.sln -c Release
+dotnet build MicroGrid.sln -c Release
+```
+
+Expected: `Passed: 13, Failed: 0`.
+
+## Run in a container
+
+```bash
+docker build -t micro-grid-bot .
+docker run --rm \
+  -e MICROGRID_MODE=demo \
+  -e OKX_API_KEY=...        -e OKX_API_SECRET=...    -e OKX_PASSPHRASE=... \
+  -v "$PWD/data:/data" \
+  micro-grid-bot
+```
+
+> Exchange env vars above are placeholders — the OKX.Net adapter is not wired in this build.
+> The worker currently runs an empty `Host.CreateApplicationBuilder` shell so the container image
+> can be validated end-to-end (build → run → exit) without secrets.
+
+### Live keys, when we get there
+
+OKX live keys must be:
+
+- **trade-only** (no withdraw)
+- **IP-whitelisted** to the host running the container
+- stored in env or a mounted secrets file — **never** committed to the image
+
+## Configuration
+
+`appsettings.json` is the baseline; env vars override (`MicroGrid__ActivePct`, `MicroGrid__Levels`,
+`MicroGrid__Spacing`, …). SQLite state path defaults to `/data/state.db` inside the container.
 
 ## Development
 
-This repo lives under `/Users/mike/Projects/BriarForge/` and inherits the parent folder's git wrapper rules. See `AGENTS.md` for the wrapper table. Use your own wrapper (`git-vladislava`, `git-aoife`, etc.) for every commit and push.
-
-## Discord
-
-Thread workspace: `AI/bf-github-repos/micro-grid-bot/` on OneDrive.
+This repo lives under `/Users/mike/Projects/BriarForge/`. All git activity must go through a
+per-person wrapper (`git-aoife`, `git-declan`, `git-milena`, `git-sofia`, …) — see `AGENTS.md`.
+Bare `git push` is forbidden in this folder.

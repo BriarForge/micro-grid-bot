@@ -4,7 +4,7 @@ Status: locked with scope v1. Code has not been scaffolded yet.
 
 ## Portability & multi-exchange constraints (locked)
 
-- **Runtime:** .NET 8 (LTS). Publish targets: `linux-x64`, `linux-arm64`. No Windows-only APIs.
+- **Runtime:** .NET 10 (current SDK installed on dev box; publish targets `linux-x64`, `linux-arm64`). No Windows-only APIs. Containers pin `mcr.microsoft.com/dotnet/sdk:10.0` and `mcr.microsoft.com/dotnet/runtime:10.0` (see `Dockerfile`).
 - **Host:** single console worker running as a container. Config from env / mounted `appsettings.json`. No GUI dependency.
 - **Secrets:** env vars or mounted file. Never committed. Already covered by `.gitignore`.
 - **State:** SQLite file on a volume (portable path) or in-memory for paper mode. Path configurable.

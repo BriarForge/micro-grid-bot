@@ -2,7 +2,7 @@
 status: accepted-v1
 source: user message.txt / Discord scope
 locked:
-  language: .NET 8+
+  language: .NET 10 (host SDK; LTS-up only)
   exchange_lib: CryptoExchange.Net + OKX.Net (v1)
   symbol: BTC-USDT spot
   host_target: container-first (Docker), os-neutral
