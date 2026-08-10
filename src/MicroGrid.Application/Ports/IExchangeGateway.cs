@@ -13,6 +13,12 @@ public interface IExchangeGateway
     /// <summary>Current free balance per asset on the trading account.</summary>
     Task<Balances> GetBalancesAsync(CancellationToken ct);
 
+    /// <summary>
+    /// Fetch the current account-specific fee rates for an instrument. Implementations must
+    /// refresh this from the exchange; callers must not substitute configured fee assumptions.
+    /// </summary>
+    Task<TradingFeeRates> GetFeeRatesAsync(string symbol, CancellationToken ct);
+
     /// <summary>Subscribe to order updates (filled, partial, canceled) for the trading account.</summary>
     IAsyncEnumerable<OrderUpdate> StreamOrdersAsync(CancellationToken ct);
 
@@ -37,6 +43,13 @@ public sealed record InstrumentSpec(
     decimal MinNotional);
 
 public sealed record Balances(decimal UsdtFree, decimal BtcFree, DateTimeOffset AsOf);
+
+public sealed record TradingFeeRates(
+    string Symbol,
+    decimal MakerRate,
+    decimal TakerRate,
+    string Tier,
+    DateTimeOffset AsOf);
 
 public sealed record OpenOrder(
     string ExchangeOrderId,

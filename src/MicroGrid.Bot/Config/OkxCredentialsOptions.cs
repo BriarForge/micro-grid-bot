@@ -8,6 +8,8 @@ public sealed class OkxCredentialsOptions
     public string? ApiSecret { get; set; }
     public string? Passphrase { get; set; }
     public bool DemoMode { get; set; } = true;
+    public bool RunOnce { get; set; }
+    public string Region { get; set; } = "AU";
 
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(ApiKey) &&

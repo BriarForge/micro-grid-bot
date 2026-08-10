@@ -13,8 +13,7 @@ public sealed record GridSettings(
     int Levels = 25,
     decimal Spacing = 0.0012m,
     int BuyLevelsBelowMid = 12,
-    int SellLevelsAboveMid = 13,
-    decimal MakerFeeRate = 0.00025m
+    int SellLevelsAboveMid = 13
 )
 {
     public void Validate()
