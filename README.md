@@ -60,3 +60,19 @@ docker run --rm --env-file .env -p 127.0.0.1:5080:8080 -v "$PWD/data:/app/data" 
 
 The accepted product scope is in `docs/scope/okx-spot-btc-micro-grid.md`; architecture details are
 in `docs/architecture/overview.md`.
+
+## Localhostmgr
+
+Registered as `micro-grid-bot` on port **5080**, health probe `/health`. Currently disabled
+until a real `.env` exists (never commit it).
+
+```bash
+cp .env.example .env   # fill OKX_API_KEY / OKX_API_SECRET / OKX_PASSPHRASE
+localhostmgr enable micro-grid-bot
+localhostmgr start  micro-grid-bot
+localhostmgr status micro-grid-bot
+curl -s http://127.0.0.1:5080/health
+```
+
+Dashboard: http://127.0.0.1:5080/
+Supervisor portal: http://localhost:19999/
