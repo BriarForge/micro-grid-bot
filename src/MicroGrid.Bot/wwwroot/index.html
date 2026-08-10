@@ -34,6 +34,24 @@
         <div class="legend"><span><i class="buy"></i>Buy levels</span><span><i class="sell"></i>Sell levels</span><span id="updated">Not updated</span></div>
       </article>
 
+      <article class="panel credentials">
+        <div class="panel-head"><div><span class="eyebrow">EXCHANGE KEYS</span><h2>OKX credentials</h2></div><span id="credentialsChip" class="tag offline">UNCONFIGURED</span></div>
+        <p class="hint">Keys are encrypted with ASP.NET Core DataProtection and stored at <code>data/okx-credentials.dp</code>. Back them up by preserving <code>data/dp-keys/</code> alongside.</p>
+        <form id="credentialsForm" autocomplete="off">
+          <label>API key<input id="apiKey" type="text" autocomplete="off" spellcheck="false" required></label>
+          <label>API secret<input id="apiSecret" type="password" autocomplete="new-password" required></label>
+          <label>Passphrase<input id="passphrase" type="password" autocomplete="new-password" required></label>
+          <div class="two"><label><input id="demoMode" type="checkbox" checked> Demo trading</label><label>Region<select id="region"><option value="GLOBAL">GLOBAL</option><option value="AU">AU</option><option value="US">US</option></select></label></div>
+          <div class="row"><button type="submit">Save credentials</button><button type="button" id="credentialsClear" class="ghost">Clear stored keys</button></div>
+          <p id="credentialsResult" class="form-note"></p>
+        </form>
+        <dl class="credential-status">
+          <div><dt>Masked key</dt><dd id="keyHint">—</dd></div>
+          <div><dt>Environment</dt><dd id="keyEnv">—</dd></div>
+          <div><dt>Updated</dt><dd id="keyUpdated">—</dd></div>
+        </dl>
+      </article>
+
       <article class="panel settings">
         <div class="panel-head"><div><span class="eyebrow">STRATEGY</span><h2>Grid settings</h2></div><span class="tag locked">TRADING LOCKED</span></div>
         <form id="settingsForm">

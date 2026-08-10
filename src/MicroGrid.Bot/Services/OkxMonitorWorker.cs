@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Options;
 using MicroGrid.Domain.Grid;
 using OKX.Net;
@@ -10,30 +11,47 @@ public sealed class OkxMonitorWorker(
     IOptions<Config.OkxCredentialsOptions> options,
     LocalSettingsStore settingsStore,
     RuntimeState runtimeState,
+    OkxCredentialStore credentialStore,
     ILogger<OkxMonitorWorker> logger) : BackgroundService
 {
     private const string Symbol = "BTC-USDT";
-    private readonly Config.OkxCredentialsOptions _options = options.Value;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var environmentName = _options.DemoMode ? "DEMO" : "LIVE READ-ONLY";
-        runtimeState.Set(RuntimeSnapshot.Starting(environmentName));
-
-        if (!_options.IsConfigured)
-        {
-            runtimeState.Set(RuntimeSnapshot.Starting(environmentName) with { LastError = "OKX credentials are incomplete." });
-            return;
-        }
-
-        using var client = new OKXRestClient(clientOptions =>
-        {
-            clientOptions.ApiCredentials = new OKXCredentials(_options.ApiKey!, _options.ApiSecret!, _options.Passphrase!);
-            clientOptions.Environment = GetEnvironment();
-        });
+        long lastGeneration = -1;
+        OKXRestClient? client = null;
+        bool activeDemoMode = true;
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            var currentGeneration = credentialStore.Generation;
+            if (client is null || currentGeneration != lastGeneration)
+            {
+                client?.Dispose();
+                client = null;
+
+                var resolved = await ResolveAsync(options.Value, credentialStore, stoppingToken);
+                if (resolved is null)
+                {
+                    runtimeState.Set(RuntimeSnapshot.Starting("UNCONFIGURED")
+                        with { LastError = "No OKX credentials. Add them in the local dashboard." });
+                    await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                    continue;
+                }
+
+                activeDemoMode = resolved.DemoMode;
+                var local = resolved;
+                client = new OKXRestClient(clientOptions =>
+                {
+                    clientOptions.ApiCredentials = new OKXCredentials(local.ApiKey, local.ApiSecret, local.Passphrase);
+                    clientOptions.Environment = GetEnvironment(local.DemoMode, local.Region);
+                });
+                lastGeneration = currentGeneration;
+            }
+
+            var environmentName = activeDemoMode ? "DEMO" : "LIVE READ-ONLY";
+            runtimeState.Set(RuntimeSnapshot.Starting(environmentName));
+
             try
             {
                 await RefreshAsync(client, environmentName, stoppingToken);
@@ -50,6 +68,22 @@ public sealed class OkxMonitorWorker(
 
             await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
         }
+
+        client?.Dispose();
+    }
+
+    private static async Task<Config.OkxResolvedCredentials?> ResolveAsync(
+        Config.OkxCredentialsOptions configured,
+        OkxCredentialStore store,
+        CancellationToken cancellationToken)
+    {
+        var fromStore = await store.TryLoadAsync(cancellationToken);
+        if (fromStore is not null) return fromStore;
+        if (configured.IsConfigured)
+            return new Config.OkxResolvedCredentials(
+                configured.ApiKey!, configured.ApiSecret!, configured.Passphrase!,
+                configured.DemoMode, configured.Region);
+        return null;
     }
 
     private async Task RefreshAsync(OKXRestClient client, string environmentName, CancellationToken cancellationToken)
@@ -84,15 +118,15 @@ public sealed class OkxMonitorWorker(
             fees.Data.Level, assets, DateTimeOffset.UtcNow, null));
     }
 
-    private OKXEnvironment GetEnvironment()
+    private static OKXEnvironment GetEnvironment(bool demoMode, string region)
     {
-        if (_options.Region.Equals("GLOBAL", StringComparison.OrdinalIgnoreCase))
-            return _options.DemoMode ? OKXEnvironment.Demo : OKXEnvironment.Live;
-        if (_options.Region.Equals("AU", StringComparison.OrdinalIgnoreCase) || _options.Region.Equals("US", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(region, "GLOBAL", StringComparison.OrdinalIgnoreCase))
+            return demoMode ? OKXEnvironment.Demo : OKXEnvironment.Live;
+        if (string.Equals(region, "AU", StringComparison.OrdinalIgnoreCase) || string.Equals(region, "US", StringComparison.OrdinalIgnoreCase))
             return OKXEnvironment.CreateCustom(
-                _options.DemoMode ? OKXEnvironment.Demo.Name : OKXEnvironment.Live.Name,
+                demoMode ? OKXEnvironment.Demo.Name : OKXEnvironment.Live.Name,
                 "https://us.okx.com",
-                _options.DemoMode ? "wss://wsuspap.okx.com:8443" : "wss://wsus.okx.com:8443");
+                demoMode ? "wss://wsuspap.okx.com:8443" : "wss://wsus.okx.com:8443");
         throw new InvalidOperationException("OKX_REGION must be GLOBAL, AU, or US.");
     }
 }
