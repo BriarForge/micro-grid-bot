@@ -49,3 +49,14 @@ is a new adapter, not a domain rewrite.
 
 Target spacing ≈ 2× round-trip maker fee. VIP 5 (0.025% maker → 0.10–0.12% target) is the
 default; stored in config, not hardcoded.
+
+## Environments
+
+- **Dev:** worker runs on the laptop. SQLite state. No Supabase. No Vercel.
+- **Prod (MGBIP-001, proposed, not implemented yet):** worker runs on a free always-on VM
+  (Oracle Cloud Always Free ARM A1 primary, Fly.io free backup). State lives in Supabase
+  Postgres. Realtime + control API exposed. UI served by Vercel. See
+  `docs/proposals/mgbip001-web-hosting-restructure.md`.
+
+These share the same `MicroGrid.Domain` and `MicroGrid.Application`. Only the
+adapter wiring and deploy targets differ.

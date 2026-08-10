@@ -1,100 +1,44 @@
 ---
-status: draft
+status: proposed
 id: mgbip001
-title: Web hosting and deployment restructure (revised for $0/mo target)
-authors: [Vladislava]
+title: Web-operated $0/mo topology (no local PC)
+authors: [Vladislava, Aoife]
 date: 2026-08-10
 parent_thread: bf-github-repos / Micro Grid Bot
-supersedes: (none)
+supersedes: Hetzner €4.5/mo plan; "laptop runs the bot" plan
 related: [docs/scope/okx-spot-btc-micro-grid.md, docs/architecture/overview.md]
-revision: 2026-08-10 19:19 GMT+8 — target updated to $0/mo total
+revision: 2026-08-10 — constraints tightened to $0/mo total + no home PC + web-operated UI
 ---
 
-# MGBIP-001: Web hosting and deployment restructure (revised for $0/mo)
+# MGBIP-001: Web-operated $0/mo topology (no local PC)
 
-## Context
+## Constraints (locked)
 
-v1 is locked as a headless .NET 10 worker running in a single container (`docs/architecture/overview.md`: "single console worker running as a container, no GUI dependency"). The current layout is `Domain → Application → Bot`, with `IExchangeGateway` and `IStateStore` as application-layer ports, and a SQLite-backed `IStateStore`.
+- **$0/mo total.** Free tiers only. No paid VM, no paid SaaS, no dev plan with a card.
+- **No home PC.** The bot must run on a free always-on cloud VM, not on Mike's laptop.
+- **Web-operated.** Monitoring and control from a browser. No local CLI for ops.
+- **Stack stays .NET 10** for the engine. `CapitalAllocator`, `GeometricGrid`, `InventoryLedger` are coded and tested; ditching them gains nothing for $0/mo.
+- **Multi-exchange boundary stays clean.** `IExchangeGateway` does not change. OKX demo first; Binance/Bybit slots kept open.
 
-User wants the bot exposed as a web app so it can be monitored and controlled remotely.
+## Non-negotiable physics
 
-**Revision (2026-08-10, 19:19 GMT+8):** user wants $0/mo total. The previous revision proposed a $5/mo container host (Hetzner CX22). This revision compares two genuinely-free paths and recommends the one that keeps .NET.
+A maker micro-grid bot is **not** a stateless workload:
 
-## Hard constraints
+- Private WS + order/user stream must stay connected for minutes/hours. Reconnect storms are an edge case the design must own, not paper over.
+- Open orders must be cancellable from a kill switch at any moment. Latency to a kill switch you do not own is dangerous.
+- API secrets must never reach a browser, a serverless function source, or a CDN edge.
 
-- **$0/mo total.** No paid tiers. Free tiers only.
-- .NET 10 codebase stays if possible. The domain layer (`CapitalAllocator`, `GeometricGrid`, `InventoryLedger`) is coded and tested. Rewrite is a fallback, not a default.
-- `IExchangeGateway` boundary stays clean. v2 Binance/Bybit adapters must not be blocked.
-- Real money on the line. Uptime, secrets handling, and observability are non-negotiable.
-- Single owner (Mike). Ops burden must stay low.
-- House deposit goal is $2M AUD by 2029. Free tiers only.
+**Conclusion:** the bot is a **long-lived stateful container** owned by the operator. Vercel serverless, Vercel cron, and Supabase Edge Functions are explicitly rejected as the grid engine runtime. Even with $0/mo to spend, the order loop cannot live in a function-with-timeout model.
 
-## Options
+The honest reading of "completely a web app" is therefore: **web-operated system** (UI + auth + realtime in Supabase/Vercel, engine in a free VM). Not "serverless-only monolith."
 
-### E. Vercel + Supabase + bot on Oracle Cloud Always Free (recommended, $0/mo, keep .NET)
-
-- **Oracle Cloud Always Free** gives 4 ARM Ampere A1 cores (24GB RAM total), 200GB block storage, 10TB outbound/mo. Always free, no time limit.
-- Bot runs as a Docker container on a free ARM A1 instance. .NET 10 supports linux-arm64 out of the box (already in `Directory.Build.props`).
-- **Vercel hobby** hosts the Next.js dashboard (free tier).
-- **Supabase free** provides Postgres (500MB), Auth (magic link + OAuth), Realtime.
-- **Total: $0/mo forever.**
-
-Pros: free in perpetuity, infrastructure already committed to. .NET 10 already supports arm64. No rewrite, no risk.
-Cons: Oracle Cloud signup is more friction than Hetzner (KYC, region selection, capacity quirks). Account idle reclamation risk if consistently idle. ARM-only forces careful multi-arch image builds. Setup is one-time but real work.
-
-**Oracle Cloud Always Free capacity (ARM A1):**
-- 4 OCPUs total (split as 1×4, 2×2, 4×1)
-- 24GB RAM total (1GB per OCPU)
-- 200GB block storage total
-- 10TB outbound/mo
-
-A single bot needs ~1 OCPU + 2GB RAM. Plenty of headroom for monitoring, backups, or future bots.
-
-**Oracle idle reclamation risk:** Oracle reclaims instances that are < 10% CPU, network, and memory for 7+ days. Mitigation: run a tiny monitoring sidecar (Prometheus exporter, Uptime Kuma agent, or a cron pinger) so the host shows non-trivial activity. A live trading bot with periodic fills, OKX websocket heartbeats, and dashboard polling almost always stays above 10% CPU. Idle reclamation is a real worry only for paper mode on a quiet market.
-
-### F. Vercel + Supabase + bot on Fly.io free tier (alternative, $0/mo, requires Node/TS rewrite)
-
-- **Fly.io free** offers 3 shared-cpu-1x VMs at 256MB RAM each, 3GB volume, 160GB outbound/mo. Always free.
-- 256MB is too tight for .NET 10 (runtime ~80MB + working set + websocket connections). Fine for Node.js.
-- Trade-off: rewrite the bot in Node.js or TypeScript. OKX has an official TypeScript SDK. The multi-exchange boundary stays (`IExchangeGateway` → `ExchangeGateway` TS interface).
-- **Total: $0/mo forever, after rewrite.**
-
-Pros: free forever, faster setup than Oracle, no idle reclamation risk.
-Cons: rewrite the bot (estimated 3-5 days: domain + bot wiring + tests). `CryptoExchange.Net` is .NET-only; OKX has a TS SDK but the multi-exchange boundary becomes harder. Lose the existing .NET test coverage.
-
-### G. Render free cron for the bot (rejected for live trading)
-
-- Render free cron jobs are free and don't spin down. But cron jobs aren't suitable for a reactive trading bot that needs to react to fills 24/7.
-
-Ruled out for live trading. Could be used for paper mode only.
-
-### Old options (A–D, superseded)
-
-- **A. Vercel + Supabase + bot on Hetzner CX22 (€4.5/mo)** — superseded by Option E ($0/mo, same architecture).
-- **B. Self-contained single container** — superseded by Option E (no real benefit once Oracle is free).
-- **C. Vercel + Supabase + bot on Mike's own hardware** — superseded by Option E (Oracle is more reliable than a home server).
-- **D. Vercel + rewrite bot in TypeScript** — superseded by Option F (Fly.io free is the right home for the rewrite).
-
-## Recommendation
-
-**Option E: Vercel + Supabase + bot on Oracle Cloud Always Free.**
-
-Rationale:
-- Existing code is .NET 10, tested, working. Don't rewrite what works.
-- Oracle Cloud Always Free is genuinely free in perpetuity (4 ARM cores, 24GB RAM). More than enough for a single trading bot.
-- .NET 10 supports linux-arm64 (already in `Directory.Build.props`). No image build changes.
-- $0/mo forever. Matches the user's hard constraint.
-- Oracle Cloud setup is one-time work, not recurring cost.
-
-Fallback: **Option F (Fly.io free + Node/TS rewrite)** if Oracle Cloud signup is too painful, or if the user prefers a lighter runtime. The rewrite cost is real (3-5 days) but the runtime is more idiomatic for a free-deck stack.
-
-## Proposed target architecture
+## Target architecture
 
 ```
 ┌────────────────────────────────────────────┐
 │ Vercel (Next.js, free)                     │
 │  - Dashboard UI (live grid, fills, PnL)    │
-│  - Control actions (start/pause/rescale)   │
+│  - Control actions (pause/resume/recenter) │
 │  - Auth via Supabase JS SDK                │
 └────────────────────────────────────────────┘
                  │ HTTPS + WSS
@@ -105,14 +49,14 @@ Fallback: **Option F (Fly.io free + Node/TS rewrite)** if Oracle Cloud signup is
 │  - Auth (magic link + OAuth)               │
 │  - Realtime (grid diffs, fills, errors)    │
 └────────────────────────────────────────────┘
-                 ▲ Postgres TCP + Realtime WS
+                 ▲ Postgres + Realtime WS
                  │
 ┌────────────────────────────────────────────┐
-│ Bot (Oracle Cloud Always Free, ARM A1)     │
-│  - MicroGrid.Bot (existing .NET 10 worker) │
-│  - New Postgres adapter for IStateStore    │
-│  - New Realtime publisher                  │
-│  - New minimal control API (gated)          │
+│ Bot (free always-on VM, ARM A1)            │
+│  - MicroGrid.Bot (.NET 10 worker)          │
+│  - Postgres adapter for IStateStore        │
+│  - Realtime publisher                      │
+│  - Control API (gated, env-only secrets)   │
 │  - linux-arm64 image                       │
 └────────────────────────────────────────────┘
                  │ OKX REST/WS
@@ -120,58 +64,87 @@ Fallback: **Option F (Fly.io free + Node/TS rewrite)** if Oracle Cloud signup is
              OKX Exchange
 ```
 
-## Proposed repo layout
+| Layer | Choice | $0? | Role |
+|---|---|---|---|
+| Trading engine | .NET 10 worker in container | yes on free VM | Order loop, keys, WS, kill switch |
+| Bot host | Oracle Cloud Always Free (ARM A1), Fly.io free as backup | yes | Replaces home PC |
+| State / auth / realtime | Supabase free | yes | Postgres + magic-link + live UI |
+| Dashboard | Vercel free (Next.js) | yes | Monitor + control only |
+| Exchange | OKX demo first via OKX.Net | — | Behind `IExchangeGateway` |
 
-New projects:
-- `src/MicroGrid.Web/` — Next.js app (TypeScript, deployed to Vercel)
-- `src/MicroGrid.Infrastructure.Postgres/` — Postgres adapter for `IStateStore`
-- `src/MicroGrid.Infrastructure.Realtime/` — Supabase Realtime publisher
-
-Modified projects:
-- `src/MicroGrid.Bot/` — add PostgreSQL + Realtime wiring, add minimal control API, secrets via env, linux-arm64 image
-- `src/MicroGrid.Application/` — no port changes; same `IStateStore` interface, new adapter behind it
-- `docs/architecture/overview.md` — bump to v2 with the new layers
-- `docs/scope/okx-spot-btc-micro-grid.md` — supersede-or-amend to v2
-
-New infra:
-- `infra/supabase/` — Supabase project setup, migrations, RLS policies
-- `infra/vercel/` — Vercel project config, env matrix
-- `infra/bot-host/` — Oracle Cloud ARM A1 bootstrap, Dockerfile polish, Caddy reverse proxy, Let's Encrypt, restart policy
-
-New docs:
-- `docs/operations/runbook.md` — Oracle Cloud ops, secret rotation, DB backups, idle reclamation mitigation
-
-## Migration plan
-
-1. **Approve MGBIP-001** (this doc).
-2. **Oracle Cloud setup.** Create a free-tier account, create an ARM A1 shape in Sydney (closest to Perth) or another region with capacity, install Docker, configure UFW. One-time.
-3. **Postgres swap.** Stand up a Supabase project. Add `MicroGrid.Infrastructure.Postgres` implementing `IStateStore`. Bot still runs as a single container. Verify trades, fills, and inventory land in Postgres with the same semantics as SQLite.
-4. **Realtime.** Add a publisher from the bot to Supabase Realtime for: grid state diffs, fills, errors. No UI yet.
-5. **Control API.** Add a minimal HTTP API on the bot (start/pause/recenter/rescale/update config), gated by a shared secret + IP allowlist. Front with Caddy + Let's Encrypt.
-6. **Dashboard v1.** Stand up `MicroGrid.Web` (Next.js) on Vercel. Read state from Supabase, subscribe to Realtime, render live grid, fills feed, PnL summary, current config. No control yet.
-7. **Dashboard control.** Wire control buttons to the bot's API, gated by Supabase Auth (magic link minimum).
-8. **Bot deploy.** Move the bot from local dev to Oracle ARM A1. Wire secrets via env. Add health endpoint, restart policy, log shipping.
-9. **Cutover.** Disable any local runs. Update `docs/operations/runbook.md`.
-
-## Open questions
-
-- Oracle Cloud account creation: any prior experience? (Drives whether Option E or Option F is more attractive.)
-- Mobile-first or laptop-first dashboard? (Drives whether Auth must support OAuth + TOTP, or if magic link is enough.)
-- Single-tenant (Mike only) or multi-user from day one? (Affects Supabase RLS design.)
-- Paper mode first or live trading first? (Paper can run on free tiers indefinitely; live needs the production split immediately.)
-- Notification channel on error: email, Discord webhook, Telegram, SMS? (Discord webhook is free and Mike already owns the channel.)
-- Domain name? (Drives DNS + Vercel + Oracle setup.)
-- Confirm Oracle Cloud Always Free tier is acceptable, or prefer the Fly.io free + Node/TS rewrite path?
-
-## Cost summary
+## $0/mo cost table
 
 | Tier | Vercel | Supabase | Bot host | Total/mo |
 |---|---|---|---|---|
-| Dev / paper | Free | Free | $0 (Mike's laptop) | $0 |
-| Production (Option E) | Free | Free | Oracle Cloud Always Free | $0 |
-| Production (Option F, after rewrite) | Free | Free | Fly.io free | $0 |
-| Paid upgrade (if needed) | Pro $20 | Pro $25 | Hetzner CX22 €4.5 | ~$50 |
+| Dev / paper | Free | Free | $0 (Mike's laptop, optional) | $0 |
+| Prod (primary) | Free | Free | Oracle Cloud Always Free | **$0** |
+| Prod (backup)  | Free | Free | Fly.io free VMs | **$0** |
+| What blows the free tier | Pro features, team seats, custom domains on paid tier (free has limited domains) | >500MB DB, >2GB egress/mo, Pro add-ons | Idle-reclaim on Oracle if host sits idle 7+ days | — |
+
+**Oracle idle reclamation note:** Always Free ARM instances may be reclaimed if CPU/network/mem < 10% for 7+ days. Mitigation: a live trading bot with periodic fills, OKX WS heartbeats, and dashboard polling is rarely idle. Add a tiny cron pinger or Prometheus exporter for paper mode on quiet markets.
+
+## What "no local PC" actually means
+
+- **Bot:** runs in the free VM. Owns OKX keys. Owns the kill switch.
+- **Dev laptop:** optional, for coding. Not on the order path.
+- **Dashboard:** browser-only, served by Vercel. No local install.
+- **State:** Supabase Postgres. Backup snapshot on a schedule.
+
+## Build order (unchanged — hosting does not reorder engine work)
+
+1. **Track A — paper `IExchangeGateway` + grid orchestrator.** Place → fill → re-arm → rescale → exposure block. No network. Green tests for the full loop.
+2. **Drop-protection policy.** Expand lower first, full recenter only on second trigger or manual command.
+3. **OKX demo adapter** behind `IExchangeGateway`. Demo keys, trade-only, IP allowlist.
+4. **Thin control API on the bot.** `/status`, `/pause`, `/resume`, `/recenter`, `/rescale`. Shared-secret or Tailscale in front. No public internet exposure.
+5. **Supabase mirror.** Postgres adapter for `IStateStore`. Realtime publisher for grid diffs, fills, errors.
+6. **Vercel dashboard v1.** Next.js. Reads Supabase, subscribes Realtime. Control buttons call the bot's API through Supabase Auth.
+7. **Bot deploy to Oracle Cloud ARM A1.** Multi-arch image (linux-x64 + linux-arm64). Restart policy, log shipping, health endpoint.
+
+## Security
+
+- OKX keys live **only** on the bot VM, mounted as env or a docker secret. Never in Vercel, Supabase config, or repo.
+- Trade-only OKX keys with IP allowlist. Withdraw disabled.
+- Supabase RLS so the dashboard can only see its own user's data (single-tenant for v1, but RLS designed in).
+- Control API auth'd (Supabase JWT for dashboard calls, shared-secret for direct API access). Rate-limited.
+- Discord webhook for alerts (free, Mike already owns the channel).
+
+## Explicitly rejected
+
+- **Vercel serverless / cron as the grid engine.** Timeout model + cold start + no long-lived WS.
+- **Supabase Edge Functions as the grid engine.** Same timeout model. Worse for secrets handling.
+- **"Pure serverless trading bot" on any vendor.** Fantasy for this scope.
+- **Rewriting domain to TS only so it can sit on Vercel.** Doesn't solve the long-lived process problem; throws away 13 green tests and OKX.Net.
+
+## Proposed repo changes (when implementation starts)
+
+New:
+- `src/MicroGrid.Web/` — Next.js (deployed to Vercel)
+- `src/MicroGrid.Infrastructure.Postgres/` — Postgres adapter for `IStateStore`
+- `src/MicroGrid.Infrastructure.Realtime/` — Supabase Realtime publisher
+- `infra/supabase/` — migrations + RLS policies
+- `infra/vercel/` — project config + env matrix
+- `infra/bot-host/` — Oracle ARM A1 bootstrap, Caddy reverse proxy, restart policy
+- `docs/operations/runbook.md` — Oracle ops, secret rotation, DB backups, idle mitigation
+
+Modified:
+- `src/MicroGrid.Bot/` — Postgres + Realtime wiring, control API, linux-arm64 image
+- `src/MicroGrid.Application/` — **no port changes**; same `IStateStore`, new adapter behind it
+- `docs/architecture/overview.md` — short subsection for prod topology (dev vs prod)
+- `docs/scope/okx-spot-btc-micro-grid.md` — supersede-or-amend to v2 only when implementation lands
+
+Untouched:
+- `src/MicroGrid.Domain/` — pure logic, no change
+- 13 domain tests — no change
+
+## Open questions
+
+- Oracle Cloud account OK, or prefer Fly.io free (slightly tighter VM resources, no idle-reclaim risk)?
+- Domain name? (Drives DNS + Vercel custom domain + Oracle setup.)
+- Discord webhook for alerts vs email/SMS? (Discord is free.)
+- Single-tenant (Mike only) from day one, or multi-user RLS?
+- Paper mode first (free forever) or jump straight to live?
+- Vercel custom domain on free tier — OK or do we need Pro for the domain?
 
 ## Status
 
-`draft`. Pending review and approval. Revision reflects $0/mo target.
+`proposed`. Direction is locked; **implementation is deferred** until Track A (paper engine) is green. MGBIP-001 changes hosting, not engine — it does not reprioritize paper → drop-protection → OKX demo → thin control API → Supabase → Vercel.
