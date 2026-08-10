@@ -9,7 +9,7 @@ public sealed class OkxCredentialsOptions
     public string? Passphrase { get; set; }
     public bool DemoMode { get; set; } = true;
     public bool RunOnce { get; set; }
-    public string Region { get; set; } = "AU";
+    public string Region { get; set; } = "GLOBAL";
 
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(ApiKey) &&

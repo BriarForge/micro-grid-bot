@@ -23,7 +23,7 @@ RUN dotnet publish src/MicroGrid.Bot/MicroGrid.Bot.csproj \
     /p:UseAppHost=false
 
 # ---- runtime ----
-FROM mcr.microsoft.com/dotnet/runtime:10.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish ./
 
@@ -36,6 +36,8 @@ USER 10001:10001
 ENV MICROGRID_STATE_DIR=/data
 ENV DOTNET_RUNNING_IN_CONTAINER=true
 ENV DOTNET_EnableDiagnostics=0
+ENV MICROGRID_URL=http://0.0.0.0:8080
+EXPOSE 8080
 VOLUME ["/data"]
 
 ENTRYPOINT ["dotnet", "MicroGrid.Bot.dll"]
