@@ -76,3 +76,25 @@ OKX live keys must be:
 This repo lives under `/Users/mike/Projects/BriarForge/`. All git activity must go through a
 per-person wrapper (`git-aoife`, `git-declan`, `git-milena`, `git-sofia`, …) — see `AGENTS.md`.
 Bare `git push` is forbidden in this folder.
+
+## Web control plane
+
+The first Vercel/Supabase dashboard slice lives in `src/MicroGrid.Web`; its source-controlled
+database contract is under `infra/supabase`. The web and engine deliberately use separate
+environment templates. Keep `OKX_API_KEY`, `OKX_API_SECRET`, and `OKX_PASSPHRASE` only on the
+machine running `MicroGrid.Bot`—they are intentionally not consumed by the web app.
+
+```powershell
+Set-Location src/MicroGrid.Web
+Copy-Item .env.example .env.local
+npm.cmd install
+npm.cmd run dev
+```
+
+For the engine host, copy the repository-root `.env.example` into your secret manager or service
+environment and provide the three OKX values there. The file is a key-name template only; the
+worker reads actual values from process environment variables.
+
+The dashboard displays a configuration screen until valid Supabase public values are present.
+Apply `infra/supabase/migrations/202608100001_initial_control_plane.sql`, create an Auth user, then
+follow the commented seed statements in `infra/supabase/seed.sql` to authorize the first operator.

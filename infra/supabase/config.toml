@@ -1,0 +1,10 @@
+project_id = "micro-grid-bot"
+
+[api]
+enabled = true
+schemas = ["public", "graphql_public"]
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/auth/callback"]
