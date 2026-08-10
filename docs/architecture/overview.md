@@ -29,7 +29,9 @@ and `MicroGrid.Application` unchanged.
 ## Initial grid knobs (scope defaults; flip later in `appsettings.json`)
 
 - Symbol: BTC-USDT spot, unified account, spot mode
-- Spacing: 0.12% geometric, 25 levels, ±~1.5% range
+- Spacing: configured minimum 0.12% geometric, 25 levels. Effective spacing is resolved at
+  startup from the account-specific maker fee returned by the exchange API and is at least
+  2 × the maker round-trip fee target.
 - Order style: equal USDT notional per level
 - Active / reserve: 65% / 35% of equity
 - Max BTC exposure: 65% (block buys) / 60% (resume) — hysteresis
@@ -47,8 +49,10 @@ is a new adapter, not a domain rewrite.
 
 ## Fee tier
 
-Target spacing ≈ 2× round-trip maker fee. VIP 5 (0.025% maker → 0.10–0.12% target) is the
-default; stored in config, not hardcoded.
+Target spacing is at least 2× the round-trip maker fee. The engine fetches account- and
+instrument-specific maker/taker rates from the exchange during startup and refreshes them before
+strategy activation. Fee percentages are runtime exchange data and must never be hardcoded or
+stored as strategy defaults. If fees cannot be refreshed, order placement remains disabled.
 
 ## Environments
 

@@ -29,6 +29,7 @@
 *.env
 .env
 .env.*
+!.env.example
 appsettings.*.local.json
 secrets.json
 okx-*.json
@@ -39,6 +40,12 @@ logs/
 *.db
 *.db-journal
 *.log
+
+# JavaScript / Next.js
+node_modules/
+.next/
+.vercel/
+*.tsbuildinfo
 
 # macOS noise
 .DS_Store

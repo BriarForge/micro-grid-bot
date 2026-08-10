@@ -1,0 +1,3 @@
+-- Run after creating your first Supabase Auth user. Replace the UUID before executing.
+-- insert into public.bot_instances (id, name, mode) values ('00000000-0000-0000-0000-000000000001', 'OKX BTC-USDT', 'paper');
+-- insert into public.bot_memberships (bot_id, user_id, role) values ('00000000-0000-0000-0000-000000000001', 'YOUR_AUTH_USER_UUID', 'owner');
