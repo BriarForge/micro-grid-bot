@@ -33,6 +33,8 @@
 appsettings.*.local.json
 secrets.json
 okx-*.json
+okx-credentials.dp*
+dp-keys/
 
 # Runtime state / logs
 data/
