@@ -3,6 +3,11 @@ using MicroGrid.Bot.Config;
 using MicroGrid.Bot.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Load repository-local configuration before refreshing the environment provider.
+// WebApplication.CreateBuilder reads environment variables during construction, so values
+// added to the process by EnvFileLoader would otherwise be invisible to IConfiguration.
+var envFile = EnvFileLoader.LoadFromRepositoryRoot(Directory.GetCurrentDirectory());
 builder.Configuration.AddEnvironmentVariables();
 
 // -- DataProtection: per-host key ring under MICROGRID_STATE_DIR/dp-keys --
@@ -16,9 +21,6 @@ builder.Services
     .AddDataProtection()
     .SetApplicationName("MicroGrid.Bot")
     .PersistKeysToFileSystem(new DirectoryInfo(dpKeysDir));
-
-// -- Env file loader kept for non-secret prefs only; .env is no longer required --
-var envFile = EnvFileLoader.LoadFromRepositoryRoot(Directory.GetCurrentDirectory());
 
 builder.WebHost.UseUrls(builder.Configuration["MICROGRID_URL"] ?? "http://127.0.0.1:5080");
 
@@ -60,16 +62,24 @@ app.MapPut("/api/settings", async (LocalBotSettings settings, LocalSettingsStore
 });
 
 // -- New credential endpoints: status-only on GET; secrets accepted on PUT/DELETE --
-app.MapGet("/api/credentials", async (OkxCredentialStore store, CancellationToken ct) =>
-    Results.Ok(await store.GetStatusAsync(ct)));
+app.MapGet("/api/credentials", async (
+    OkxCredentialStore store,
+    Microsoft.Extensions.Options.IOptions<OkxCredentialsOptions> options,
+    CancellationToken ct) =>
+    Results.Ok(await ResolveCredentialStatusAsync(store, options.Value, ct)));
 
-app.MapPut("/api/credentials", async (OkxCredentialInput input, OkxCredentialStore store, ILoggerFactory log, CancellationToken ct) =>
+app.MapPut("/api/credentials", async (
+    OkxCredentialInput input,
+    OkxCredentialStore store,
+    Microsoft.Extensions.Options.IOptions<OkxCredentialsOptions> options,
+    ILoggerFactory log,
+    CancellationToken ct) =>
 {
     try
     {
         await store.SaveAsync(input, ct);
         log.CreateLogger("credentials").LogInformation("OKX credentials saved via local UI.");
-        return Results.Ok(await store.GetStatusAsync(ct));
+        return Results.Ok(await ResolveCredentialStatusAsync(store, options.Value, ct));
     }
     catch (ArgumentException exception)
     {
@@ -77,11 +87,15 @@ app.MapPut("/api/credentials", async (OkxCredentialInput input, OkxCredentialSto
     }
 });
 
-app.MapDelete("/api/credentials", async (OkxCredentialStore store, ILoggerFactory log, CancellationToken ct) =>
+app.MapDelete("/api/credentials", async (
+    OkxCredentialStore store,
+    Microsoft.Extensions.Options.IOptions<OkxCredentialsOptions> options,
+    ILoggerFactory log,
+    CancellationToken ct) =>
 {
     await store.ClearAsync(ct);
     log.CreateLogger("credentials").LogInformation("OKX credentials cleared via local UI.");
-    return Results.Ok(await store.GetStatusAsync(ct));
+    return Results.Ok(await ResolveCredentialStatusAsync(store, options.Value, ct));
 });
 
 app.MapGet("/health", (RuntimeState state) => Results.Ok(new
@@ -91,7 +105,21 @@ app.MapGet("/health", (RuntimeState state) => Results.Ok(new
 }));
 
 if (envFile is not null)
-    app.Logger.LogInformation("Loaded non-secret preferences from {EnvFile}", envFile);
+    app.Logger.LogInformation("Loaded local configuration from {EnvFile}", envFile);
 app.Logger.LogInformation("Local dashboard: {Url}", builder.Configuration["MICROGRID_URL"] ?? "http://127.0.0.1:5080");
 app.Logger.LogInformation("DP key ring: {KeysDir}", dpKeysDir);
 await app.RunAsync();
+
+static async Task<OkxCredentialStatus> ResolveCredentialStatusAsync(
+    OkxCredentialStore store,
+    OkxCredentialsOptions configured,
+    CancellationToken cancellationToken)
+{
+    var stored = await store.GetStatusAsync(cancellationToken);
+    if (stored.Configured || !configured.IsConfigured)
+        return stored;
+
+    var key = configured.ApiKey!;
+    var hint = key.Length <= 4 ? "****" : "...." + key[^4..];
+    return new OkxCredentialStatus(true, configured.DemoMode, configured.Region, hint, null);
+}
