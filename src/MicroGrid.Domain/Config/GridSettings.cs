@@ -19,8 +19,13 @@ public sealed record GridSettings(
     public void Validate()
     {
         if (ActivePct <= 0 || ActivePct > 1) throw new ArgumentOutOfRangeException(nameof(ActivePct));
+        if (ReservePct < 0 || ReservePct >= 1) throw new ArgumentOutOfRangeException(nameof(ReservePct));
+        if (ActivePct + ReservePct != 1m)
+            throw new ArgumentException("ActivePct and ReservePct must total 1.");
         if (Levels <= 0) throw new ArgumentOutOfRangeException(nameof(Levels));
-        if (Spacing <= 0) throw new ArgumentOutOfRangeException(nameof(Spacing));
+        if (Spacing <= 0 || Spacing >= 1) throw new ArgumentOutOfRangeException(nameof(Spacing));
+        if (BuyLevelsBelowMid < 0) throw new ArgumentOutOfRangeException(nameof(BuyLevelsBelowMid));
+        if (SellLevelsAboveMid < 0) throw new ArgumentOutOfRangeException(nameof(SellLevelsAboveMid));
         if (BuyLevelsBelowMid + SellLevelsAboveMid != Levels)
             throw new ArgumentException(
                 $"BuyLevelsBelowMid ({BuyLevelsBelowMid}) + SellLevelsAboveMid ({SellLevelsAboveMid}) " +

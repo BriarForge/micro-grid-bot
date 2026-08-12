@@ -26,11 +26,10 @@ public class GeometricGridTests
         var grid = new GeometricGrid(Cfg(spacing: 0.0012m));
         var prices = grid.Build(100_000m);
 
-        // Adjacent ratios: levels[k+1] / levels[k] ≈ 1 + spacing for upper cluster
-        // We can verify the spread: top / bottom ≈ (1+s)^above / (1-s)^below.
+        // The same 1+s geometric ratio applies across both sides of mid.
         decimal top = prices[^1];
         decimal bottom = prices[0];
-        decimal expected = (decimal)Math.Pow(1.0012, 13) / (decimal)Math.Pow(0.9988, 12);
+        decimal expected = (decimal)Math.Pow(1.0012, 25);
         decimal actual = top / bottom;
 
         Assert.InRange(actual / expected, 0.999_999m, 1.000_001m);
@@ -48,8 +47,9 @@ public class GeometricGridTests
         Assert.Equal(Math.Ceiling(buy * 1.0012m * 1_000_000m) / 1_000_000m, sell);
 
         decimal nextBuy = grid.BuyForSell(sell);
-        // Round-trip downward by spacing; result is the floor of (1-s)*sell
-        Assert.Equal(Math.Floor(sell * 0.9988m * 1_000_000m) / 1_000_000m, nextBuy);
+        // The inverse step returns to the original buy level.
+        Assert.Equal(Math.Floor(sell / 1.0012m * 1_000_000m) / 1_000_000m, nextBuy);
+        Assert.Equal(buy, nextBuy);
     }
 
     [Fact]

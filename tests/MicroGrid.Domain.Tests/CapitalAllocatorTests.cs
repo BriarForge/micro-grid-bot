@@ -61,4 +61,13 @@ public class CapitalAllocatorTests
         Assert.Throws<ArgumentOutOfRangeException>(
             () => CapitalAllocator.Compute(1000m, 0m, 0m, Cfg()));
     }
+
+    [Theory]
+    [InlineData(-1, 0)]
+    [InlineData(0, -1)]
+    public void NegativeBalances_Throw(decimal usdt, decimal btc)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => CapitalAllocator.Compute(usdt, btc, 100_000m, Cfg()));
+    }
 }

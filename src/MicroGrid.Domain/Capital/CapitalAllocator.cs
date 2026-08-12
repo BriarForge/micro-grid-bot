@@ -22,7 +22,9 @@ public static class CapitalAllocator
         Config.GridSettings cfg,
         bool previouslyAllowed = true)
     {
-        if (cfg.Levels <= 0) throw new ArgumentOutOfRangeException(nameof(cfg.Levels));
+        cfg.Validate();
+        if (usdt < 0) throw new ArgumentOutOfRangeException(nameof(usdt));
+        if (btc < 0) throw new ArgumentOutOfRangeException(nameof(btc));
         if (mid <= 0) throw new ArgumentOutOfRangeException(nameof(mid));
 
         decimal equity = usdt + btc * mid;

@@ -22,8 +22,9 @@ public sealed class GeometricGrid
 
         var prices = new List<decimal>(_cfg.Levels);
 
+        // Dividing by the upper-side ratio makes this a true geometric grid.
         for (int i = _cfg.BuyLevelsBelowMid; i > 0; i--)
-            prices.Add(RoundDown(mid * Pow(1m - _cfg.Spacing, i)));
+            prices.Add(RoundDown(mid / Pow(1m + _cfg.Spacing, i)));
 
         for (int i = 1; i <= _cfg.SellLevelsAboveMid; i++)
             prices.Add(RoundUp(mid * Pow(1m + _cfg.Spacing, i)));
@@ -35,7 +36,7 @@ public sealed class GeometricGrid
     public decimal SellForBuy(decimal buyPrice) => RoundUp(buyPrice * (1m + _cfg.Spacing));
 
     /// <summary>Sell fill at <paramref name="sellPrice"/> → next lower buy level.</summary>
-    public decimal BuyForSell(decimal sellPrice) => RoundDown(sellPrice * (1m - _cfg.Spacing));
+    public decimal BuyForSell(decimal sellPrice) => RoundDown(sellPrice / (1m + _cfg.Spacing));
 
     private static decimal Pow(decimal factor, int n)
     {

@@ -42,6 +42,15 @@ logs/
 *.db
 *.db-journal
 *.log
+__pycache__/
+*.py[cod]
+
+# Keep the small requested daily audit extract; minute candles remain local-only.
+!analysis/data/
+analysis/data/*
+!analysis/data/okx_btc_usdt_1d_2026_to_date.csv
+!analysis/data/okx_btc_usdt_1d_2024.csv
+!analysis/data/okx_btc_usdt_1d_20220813_to_20251007.csv
 
 # JavaScript / Next.js
 node_modules/

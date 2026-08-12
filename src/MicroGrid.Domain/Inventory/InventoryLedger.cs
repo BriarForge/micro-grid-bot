@@ -22,6 +22,9 @@ public sealed class InventoryLedger
         decimal fee = notional * feeRate;
         decimal totalCost = notional + fee;
 
+        if (totalCost > Usdt)
+            throw new InvalidOperationException("Buy cost exceeds held USDT.");
+
         if (Btc + qty > 0)
             AverageCostBasis = (AverageCostBasis * Btc + totalCost) / (Btc + qty);
 

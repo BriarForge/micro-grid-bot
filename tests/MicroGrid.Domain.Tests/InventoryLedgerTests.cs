@@ -9,6 +9,7 @@ public class InventoryLedgerTests
     {
         var l = new InventoryLedger();
         decimal fee = 0.00025m;
+        l.Seed(usdt: 2_000m, btc: 0m);
 
         l.ApplyBuy(price: 100_000m, qty: 0.01m, feeRate: fee);
         // usdt -= 1000 + 0.25 = 1000.25 → 999.75 ; btc = 0.01 ; basis ≈ 100025/0.01 = 10,002,500 (per BTC)
@@ -48,6 +49,17 @@ public class InventoryLedgerTests
         l.Seed(usdt: 0m, btc: 0.005m, averageCostBasis: 100_000m);
         Assert.Throws<InvalidOperationException>(() =>
             l.ApplySell(price: 100_000m, qty: 0.01m, feeRate: 0.00025m));
+    }
+
+    [Fact]
+    public void BuyCostExceedsUsdt_ThrowsWithoutMutatingBalances()
+    {
+        var l = new InventoryLedger();
+        l.Seed(usdt: 100m, btc: 0m);
+
+        Assert.Throws<InvalidOperationException>(() => l.ApplyBuy(100_000m, 0.002m, 0.0008m));
+        Assert.Equal(100m, l.Usdt);
+        Assert.Equal(0m, l.Btc);
     }
 
     [Fact]
